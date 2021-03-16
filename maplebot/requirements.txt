@@ -1,0 +1,8 @@
+# Pip requirements file
+#
+
+# WyzeSense2MQTT requirements
+pyyaml
+aiohttp
+discord
+discord-py-slash-command
