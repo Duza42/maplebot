@@ -1,15 +1,15 @@
 import asyncio
-import sys
-
-import aiohttp
-import discord
 import logging
 import logging.config
 import logging.handlers
 import os
 import shutil
-import yaml
+import sys
 
+import aiohttp
+import discord
+import texttable
+import yaml
 from discord_slash import SlashCommand
 
 # Configuration File Locations
@@ -172,6 +172,16 @@ guild_ids = CONFIG['guild_ids']  # Put your server ID in this array.
 async def _ping(ctx):  # Defines a new "context" (ctx) command called "ping."
     await ctx.respond()
     await ctx.send(f"Pong! ({client.latency * 1000}ms)")
+
+
+@slash.slash(name="rank", guild_ids=guild_ids)
+async def _rank(ctx):  # Defines a new "context" (ctx) command called "ping."
+    table = texttable.Texttable()
+    table.set_cols_align(["l", "l", "l"])
+    table.add_row(["Name", "Level", "Job"])
+    for player in client.previousPlayers.values():
+        table.add_row([player.name, player.level, player.job])
+    await ctx.send("```\n" + table.draw() + "\n```\n")
 
 
 client.run(CONFIG['bot_token'])
