@@ -115,19 +115,23 @@ class MapleBot(discord.Client):
                                     except KeyError as e:
                                         LOGGER.info('old_player does not exist, recently added?', str(e))
                                     if previous_player.level != player.level:
-                                        message = f'{player.name} is now level {player.level}!'
+                                        level_message = f'{player.name} is now level {player.level}!'
                                         for player2 in CONFIG['players']:
                                             try:
                                                 previous_player2 = self.previousPlayers[player2]
                                                 player2 = self.players[player2]
                                                 if previous_player.level <= previous_player2.level and player.level > player2.level:
-                                                    message += f' {player.name} has passed {player2.name}!'
+                                                    level_message += f' {player.name} has passed {player2.name}!'
                                                 if player.level == player2.level and player.name != player2.name:
-                                                    message += f' {player.name} is now the same level as {player2.name}!'
+                                                    level_message += f' {player.name} is now the same level as {player2.name}!'
                                             except KeyError as e:
                                                 LOGGER.info('error getting previous player', str(e))
-                                        await channel.send(message)
-                                        LOGGER.info(message)
+                                        await channel.send(level_message)
+                                        LOGGER.info(level_message)
+                                    if previous_player.job != player.job:
+                                        job_message = f'{player.name} is now a {player.job}!'
+                                        await channel.send(job_message)
+                                        LOGGER.info(job_message)
                             else:
                                 LOGGER.info('Nothing in the previous dict')
                             self.previousPlayers = self.players.copy()
