@@ -1,8 +1,12 @@
 bot_token:
 guild_name:
-guild_ids:
+guild_id:
 notification_channel:
-player_api:
 players:
 playing_game:
 poll_seconds:
+db_host:
+db_port:
+db_user:
+db_database:
+db_password:

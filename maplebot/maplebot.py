@@ -6,11 +6,13 @@ import os
 import shutil
 import sys
 
-import aiohttp
 import discord
 import texttable
 import yaml
-from discord_slash import SlashCommand
+import mysql.connector
+
+from discord import app_commands
+from discord.ext import tasks, commands
 
 # Configuration File Locations
 CONFIG_PATH = "config/"
@@ -81,67 +83,74 @@ def init_config():
 
 class MapleBot(discord.Client):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # create the background task and run it in the background
-        self.bg_task = self.loop.create_task(self.fetch_player_data())
+        super().__init__(intents=intents, **kwargs)
         self.players = {}
         self.previousPlayers = {}
+        self.cnx = mysql.connector.connect(
+            host=CONFIG["db_host"],
+            port=CONFIG["db_port"],
+            user=CONFIG["db_user"],
+            database=CONFIG["db_database"],
+            password=CONFIG["db_password"])
 
     async def on_ready(self):
+        await tree.sync(guild=discord.Object(id=guild_id))
         LOGGER.info(f'Logged in as name: {self.user.name} id: {self.user.id}')
         await self.change_presence(activity=discord.Game(name=CONFIG['playing_game']))
         LOGGER.info(f'Successfully set status')
 
+    async def setup_hook(self) -> None:
+        LOGGER.info('Setting up job')
+        self.fetch_player_data.start()
+
+    @tasks.loop(seconds=60)
     async def fetch_player_data(self):
-        await self.wait_until_ready()
         channel = self.get_channel(CONFIG['notification_channel'])  # channel ID goes here
-        while not self.is_closed():
-            async with aiohttp.ClientSession() as session:
-                async with session.get(CONFIG['player_api']) as r:
-                    LOGGER.info('Attempting fetch player data')
+        LOGGER.info('Attempting fetch player data')
+        try:
+            cur = self.cnx.cursor()
+            cur.execute("SELECT name, level FROM characters WHERE name != 'Admin';")
+            LOGGER.info('Successfully fetched player data')
+            for player in cur:
+                self.players[player[0]] = Player(player[0], player[1])
+            cur.close()
+            if len(self.previousPlayers) != 0:
+                for player in self.players.values():
                     try:
-                        if r.status == 200:
-                            new_data = await r.json()
-                            LOGGER.info('Successfully fetched player data')
-                            for player in new_data['data']:
-                                if player[1] in CONFIG['players'] or player[2] == CONFIG['guild_name']:
-                                    self.players[player[1]] = Player(player[0], player[1], player[2], player[3],
-                                                                     player[4])
-                            if len(self.previousPlayers) != 0:
-                                for player in self.players.values():
-                                    try:
-                                        previous_player = self.previousPlayers[player.name]
-                                    except KeyError as e:
-                                        LOGGER.info('old_player does not exist, recently added?', str(e))
-                                    if previous_player.level != player.level:
-                                        level_message = f'{player.name} is now level {player.level}!'
-                                        for player2 in CONFIG['players']:
-                                            try:
-                                                previous_player2 = self.previousPlayers[player2]
-                                                player2 = self.players[player2]
-                                                if previous_player.level <= previous_player2.level and player.level > player2.level:
-                                                    level_message += f' {player.name} has passed {player2.name}!'
-                                                if player.level == player2.level and player.name != player2.name:
-                                                    level_message += f' {player.name} is now the same level as {player2.name}!'
-                                            except KeyError as e:
-                                                LOGGER.info('error getting previous player', str(e))
-                                        await channel.send(level_message)
-                                        LOGGER.info(level_message)
-                                    if previous_player.job != player.job:
-                                        job_message = f'{player.name} is now a {player.job}!'
-                                        await channel.send(job_message)
-                                        LOGGER.info(job_message)
-                            else:
-                                LOGGER.info('Nothing in the previous dict')
-                            self.previousPlayers = self.players.copy()
-                            self.players.clear()
-                        else:
-                            LOGGER.info(f'Error fetching players: {r.status}')
-                    except:
-                        e = sys.exc_info()[0]
-                        LOGGER.info('Error getting players:', str(e))
-            await asyncio.sleep(CONFIG['poll_seconds'])  # task runs every 5 minutes
+                        previous_player = self.previousPlayers[player.name]
+                        if previous_player.level != player.level:
+                            level_message = f'{player.name} is now level {player.level}!'
+                            for player2 in CONFIG['players']:
+                                try:
+                                    previous_player2 = self.previousPlayers[player2]
+                                    player2 = self.players[player2]
+                                    if previous_player.level <= previous_player2.level and player.level > player2.level:
+                                        level_message += f' {player.name} has passed {player2.name}!'
+                                    if player.level == player2.level and player.name != player2.name:
+                                        level_message += f' {player.name} is now the same level as {player2.name}!'
+                                except KeyError as e:
+                                    LOGGER.info('error getting previous player', str(e))
+                            await channel.send(level_message)
+                            LOGGER.info(level_message)
+                        # if previous_player.job != player.job:
+                        #    job_message = f'{player.name} is now a {player.job}!'
+                        #    await channel.send(job_message)
+                        #    LOGGER.info(job_message)
+                    except KeyError as e:
+                        LOGGER.info('old_player does not exist, recently added?', str(e))
+
+            else:
+                LOGGER.info('Nothing in the previous dict')
+            self.previousPlayers = self.players.copy()
+            self.players.clear()
+        except:
+            e = sys.exc_info()[0]
+            LOGGER.info('Error getting players:', str(e))
+        await asyncio.sleep(CONFIG['poll_seconds'])
+
+    @fetch_player_data.before_loop
+    async def before_my_task(self):
+        await self.wait_until_ready()
 
     async def on_message(self, message):
         if message.author == client.user:
@@ -151,37 +160,47 @@ class MapleBot(discord.Client):
             await message.channel.send('Hello!')
 
 
+class PlayerNotfications(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self._last_member = None
+
+
 class Player(object):
-    def __init__(self, rank, name, guild, job, level):
-        self.rank = rank
+    def __init__(self, name, level):
         self.name = name
-        self.guild = guild
-        self.job = job
         self.level = level
 
 
 init_logging()
 init_config()
-client = MapleBot()
-slash = SlashCommand(client, sync_commands=True)
+intents = discord.Intents.default()
+client = MapleBot(intents)
+tree = app_commands.CommandTree(client)
+guild_id = CONFIG['guild_id']  # Put your server ID in this array.
 
-guild_ids = CONFIG['guild_ids']  # Put your server ID in this array.
 
-
-@slash.slash(name="ping", guild_ids=guild_ids)
+@tree.command(name="ping", description="Ping StumpBot", guild=discord.Object(id=guild_id))
 async def _ping(ctx):  # Defines a new "context" (ctx) command called "ping."
-    await ctx.respond()
-    await ctx.send(f"Pong! ({client.latency * 1000}ms)")
+    await ctx.response.send_message(f"Pong! ({client.latency * 1000}ms)")
 
 
-@slash.slash(name="rank", guild_ids=guild_ids)
+@tree.command(name="rank", description="Lists the rank for all characters", guild=discord.Object(id=guild_id))
 async def _rank(ctx):  # Defines a new "context" (ctx) command called "ping."
     table = texttable.Texttable()
-    table.set_cols_align(["l", "l", "l"])
-    table.add_row(["Name", "Level", "Job"])
+    table.set_cols_align(["l", "l"])
+    table.add_row(["Name", "Level"])
     for player in client.previousPlayers.values():
-        table.add_row([player.name, player.level, player.job])
-    await ctx.send("```\n" + table.draw() + "\n```\n")
+        table.add_row([player.name, player.level])
+    await ctx.response.send_message("```\n" + table.draw() + "\n```\n")
 
 
-client.run(CONFIG['bot_token'])
+async def main():
+    # do other async things
+
+    # start the client
+    async with client:
+        await client.start(CONFIG['bot_token'])
+
+
+asyncio.run(main())

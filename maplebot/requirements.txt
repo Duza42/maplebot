@@ -1,9 +1,7 @@
 # Pip requirements file
-#
 
-# WyzeSense2MQTT requirements
-pyyaml
-aiohttp
-discord
-discord-py-slash-command
-texttable
+# MapleBot requirements
+pyyaml~=6.0
+discord~=2.1.0
+texttable~=1.6.7
+mysql-connector-python~=8.0.31
