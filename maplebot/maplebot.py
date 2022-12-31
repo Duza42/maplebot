@@ -121,10 +121,9 @@ class MapleBot(discord.Client):
                         previous_player = self.previousPlayers[player.name]
                         if previous_player.level != player.level:
                             level_message = f'{player.name} is now level {player.level}!'
-                            for player2 in CONFIG['players']:
+                            for player2 in self.players.values():
                                 try:
-                                    previous_player2 = self.previousPlayers[player2]
-                                    player2 = self.players[player2]
+                                    previous_player2 = self.previousPlayers[player2.name]
                                     if previous_player.level <= previous_player2.level and player.level > player2.level:
                                         level_message += f' {player.name} has passed {player2.name}!'
                                     if player.level == player2.level and player.name != player2.name:
