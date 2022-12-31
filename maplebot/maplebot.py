@@ -92,6 +92,7 @@ class MapleBot(discord.Client):
             user=CONFIG["db_user"],
             database=CONFIG["db_database"],
             password=CONFIG["db_password"])
+        self.cnx.autocommit = True
 
     async def on_ready(self):
         await tree.sync(guild=discord.Object(id=guild_id))
@@ -109,7 +110,7 @@ class MapleBot(discord.Client):
         LOGGER.info('Attempting fetch player data')
         try:
             cur = self.cnx.cursor()
-            cur.execute("SELECT name, level FROM characters WHERE name != 'Admin';")
+            cur.execute("SELECT name, level FROM characters WHERE name != 'Admin' ORDER BY level DESC;")
             LOGGER.info('Successfully fetched player data')
             for player in cur:
                 self.players[player[0]] = Player(player[0], player[1])
