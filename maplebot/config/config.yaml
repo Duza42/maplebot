@@ -1,6 +1,6 @@
 bot_token:
-guild_name:
 guild_id:
+guild_name:
 notification_channel:
 players:
 playing_game:

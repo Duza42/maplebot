@@ -10,7 +10,7 @@ services:
     stop_signal: SIGINT
     network_mode: bridge
     volumes:
-      - "/opt/maplebot/config:/maplebot/config"
-      - "/opt/maplebot/logs:/maplebot/logs"
+      - "./maplebot/config:/maplebot/config"
+      - "./maplebot/logs:/maplebot/logs"
     environment:
       TZ: "America/Chicago"
