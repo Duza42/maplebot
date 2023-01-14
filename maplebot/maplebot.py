@@ -26,6 +26,10 @@ LEFT JOIN guilds on guilds.guildid = characters.guildid \
 WHERE characters.name != 'Admin' \
 ORDER BY characters.level DESC;"""
 
+LOGGEDIN_QUERY = """SELECT count(name) \
+FROM accounts \
+WHERE loggedin != 0"""
+
 JOBS = {
     0: 'Beginner',
     100: 'Warrior',
@@ -188,8 +192,6 @@ class MapleBot(discord.Client):
     async def on_ready(self):
         await tree.sync(guild=discord.Object(id=guild_id))
         LOGGER.info(f'Logged in as name: {self.user.name} id: {self.user.id}')
-        await self.change_presence(activity=discord.Game(name=CONFIG['playing_game']))
-        LOGGER.info(f'Successfully set status')
 
     async def setup_hook(self) -> None:
         LOGGER.info('Setting up job')
@@ -200,6 +202,12 @@ class MapleBot(discord.Client):
         channel = self.get_channel(CONFIG['notification_channel'])  # channel ID goes here
         LOGGER.info('Attempting fetch player data')
         try:
+            cur = self.cnx.cursor()
+            cur.execute(LOGGEDIN_QUERY)
+            for loggedin in cur:
+                await self.change_presence(activity=discord.Game(name=f'{loggedin[0]} online'))
+            cur.close()
+
             cur = self.cnx.cursor()
             cur.execute(CHARACTER_QUERY)
             LOGGER.info('Successfully fetched player data')
