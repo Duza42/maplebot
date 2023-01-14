@@ -20,6 +20,12 @@ SAMPLES_PATH = "samples/"
 MAIN_CONFIG_FILE = "config.yaml"
 LOGGING_CONFIG_FILE = "logging.yaml"
 
+CHARACTER_QUERY = """SELECT characters.name, characters.level, characters.job, guilds.name \
+FROM characters \
+LEFT JOIN guilds on guilds.guildid = characters.guildid \
+WHERE characters.name != 'Admin' \
+ORDER BY characters.level DESC;"""
+
 JOBS = {
     0: 'Beginner',
     100: 'Warrior',
@@ -195,10 +201,10 @@ class MapleBot(discord.Client):
         LOGGER.info('Attempting fetch player data')
         try:
             cur = self.cnx.cursor()
-            cur.execute("SELECT name, level, job FROM characters WHERE name != 'Admin' ORDER BY level DESC;")
+            cur.execute(CHARACTER_QUERY)
             LOGGER.info('Successfully fetched player data')
             for player in cur:
-                self.players[player[0]] = Player(player[0], player[1], JOBS[player[2]])
+                self.players[player[0]] = Player(player[0], player[1], JOBS[player[2]], str(player[3] or ''))
             cur.close()
             if len(self.previousPlayers) != 0:
                 for player in self.players.values():
@@ -252,10 +258,11 @@ class PlayerNotfications(commands.Cog):
 
 
 class Player(object):
-    def __init__(self, name, level, job):
+    def __init__(self, name, level, job, guild):
         self.name = name
         self.level = level
         self.job = job
+        self.guild = guild
 
 
 init_logging()
@@ -274,10 +281,10 @@ async def _ping(ctx):  # Defines a new "context" (ctx) command called "ping."
 @tree.command(name="rank", description="Lists the rank for all characters", guild=discord.Object(id=guild_id))
 async def _rank(ctx):  # Defines a new "context" (ctx) command called "ping."
     table = texttable.Texttable()
-    table.set_cols_align(["l", "l", "l"])
-    table.add_row(["Name", "Level", "Job"])
+    table.set_cols_align(["l", "l", "l", "l"])
+    table.add_row(["Name", "Level", "Job", "Guild"])
     for player in client.previousPlayers.values():
-        table.add_row([player.name, player.level, player.job])
+        table.add_row([player.name, player.level, player.job, player.guild])
     await ctx.response.send_message("```\n" + table.draw() + "\n```\n")
 
 
