@@ -43,12 +43,12 @@ JOBS = {
     131: 'Dragon Knight',
     132: 'Dark Knight',
     200: 'Magician',
-    210: 'Fire/Poison Wizard',
-    211: 'Fire/Poison Mage',
-    212: 'Fire/Poison ArchMage',
-    220: 'Ice/Lightning Wizard',
-    221: 'Ice/Lightning Mage',
-    222: 'Ice/Lightning ArchMage',
+    210: 'F/P Wizard',
+    211: 'F/P Mage',
+    212: 'F/P ArchMage',
+    220: 'I/L Wizard',
+    221: 'I/L Mage',
+    222: 'I/L ArchMage',
     230: 'Cleric',
     231: 'Priest',
     232: 'Bishop',
@@ -289,19 +289,13 @@ async def _ping(ctx):  # Defines a new "context" (ctx) command called "ping."
 @tree.command(name="rank", description="Lists the rank for all characters", guild=discord.Object(id=guild_id))
 async def _rank(ctx):  # Defines a new "context" (ctx) command called "ping."
     table = texttable.Texttable()
-    table.set_cols_align(["l", "l", "l", "l"])
-    table.add_row(["Name", "Level", "Job", "Guild"])
+    table.set_cols_align(["l", "l", "l"])
+    table.set_cols_dtype(["t", "t", "t"])
+    table.add_row(["Name", "Level", "Job"])
+    table.set_cols_width([11, 5, 15])
     for player in client.previousPlayers.values():
-        table.add_row([player.name, player.level, player.job, player.guild])
+        table.add_row([f"{player.name} ", player.level, f"{player.job} "])
     await ctx.response.send_message("```\n" + table.draw() + "\n```\n")
 
 
-async def main():
-    # do other async things
-
-    # start the client
-    async with client:
-        await client.start(CONFIG['bot_token'])
-
-
-asyncio.run(main())
+client.run(CONFIG['bot_token'])
