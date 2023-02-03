@@ -281,6 +281,10 @@ tree = app_commands.CommandTree(client)
 guild_id = CONFIG['guild_id']  # Put your server ID in this array.
 
 
+def sort_by_level(player: Player):
+    return player.level
+
+
 @tree.command(name="ping", description="Ping StumpBot", guild=discord.Object(id=guild_id))
 async def _ping(ctx):  # Defines a new "context" (ctx) command called "ping."
     await ctx.response.send_message(f"Pong! ({client.latency * 1000}ms)")
@@ -292,10 +296,13 @@ async def _rank(ctx):  # Defines a new "context" (ctx) command called "ping."
     table.set_cols_align(["l", "l", "l"])
     table.set_cols_dtype(["t", "t", "t"])
     table.add_row(["Name", "Level", "Job"])
-    table.set_cols_width([11, 5, 15])
-    for player in client.previousPlayers.values():
+    table.set_cols_width([11, 5, 18])
+    player_list = list(client.previousPlayers.values())
+    player_list.sort(key=sort_by_level, reverse=True)
+    for i in range(14):
+        player = player_list[i]
         table.add_row([f"{player.name} ", player.level, f"{player.job} "])
     await ctx.response.send_message("```\n" + table.draw() + "\n```\n")
 
 
-client.run(CONFIG['bot_token'])
+client.run(CONFIG['bot_token'], log_handler=None)
